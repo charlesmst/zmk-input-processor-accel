@@ -97,11 +97,16 @@ static int maccel_handle_event(const struct device *dev, struct input_event *eve
         dt_us = 8000;
     }
 
+    /* zip_zxy encodes negative int16 values as their uint16 bit-pattern in a uint32,
+     * so -50 arrives as 65486. Cast through int16_t to restore the correct sign before
+     * any velocity or factor calculation. Safe because trackball deltas always fit int16. */
+    int32_t value = (int16_t)event->value;
+
     float factor;
     if (dt_us > 500) {
         /* New polling cycle: compute instant velocity (matches pmw3610 maccel) */
         float dt_ms = (float)dt_us / 1000.0f;
-        group->velocity = fabsf((float)event->value) * 1000.0f / ((float)cfg->cpi * dt_ms);
+        group->velocity = fabsf((float)value) * 1000.0f / ((float)cfg->cpi * dt_ms);
         group->last_time_us = now_us;
         factor = compute_factor(cfg, group->velocity);
         group->last_factor = factor;
@@ -110,12 +115,12 @@ static int maccel_handle_event(const struct device *dev, struct input_event *eve
         factor = group->last_factor;
     }
 
-    float scaled = (float)event->value * factor + *carry;
+    float scaled = (float)value * factor + *carry;
     int32_t output = (int32_t)scaled;
     *carry = scaled - (float)output;
 
     LOG_DBG("maccel v=%.3f factor=%.3f in=%d out=%d",
-            (double)group->velocity, (double)factor, event->value, output);
+            (double)group->velocity, (double)factor, value, output);
 
     event->value = output;
     return ZMK_INPUT_PROC_CONTINUE;
