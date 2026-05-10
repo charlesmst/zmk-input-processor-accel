@@ -99,15 +99,14 @@ static int maccel_handle_event(const struct device *dev, struct input_event *eve
 
     float factor;
     if (dt_us > 500) {
-        /* New polling cycle: recompute velocity */
+        /* New polling cycle: compute instant velocity (matches pmw3610 maccel) */
         float dt_ms = (float)dt_us / 1000.0f;
-        float instant_v = fabsf((float)event->value) * 1000.0f / ((float)cfg->cpi * dt_ms);
-        group->velocity = group->velocity * 0.6f + instant_v * 0.4f;
+        group->velocity = fabsf((float)event->value) * 1000.0f / ((float)cfg->cpi * dt_ms);
         group->last_time_us = now_us;
         factor = compute_factor(cfg, group->velocity);
         group->last_factor = factor;
     } else {
-        /* Second axis in same poll cycle (e.g. Y after X): reuse factor */
+        /* Second axis in same poll burst (e.g. Y right after X): reuse factor */
         factor = group->last_factor;
     }
 
