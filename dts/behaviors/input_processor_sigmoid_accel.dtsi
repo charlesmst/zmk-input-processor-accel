@@ -1,24 +1,21 @@
 /*
- * Sigmoid Acceleration Input Processor
+ * maccel acceleration input processor instance.
  *
- * Include this file to get a pre-configured sigmoid acceleration processor.
+ * Include this file to get a pre-configured maccel processor node.
  * Then add &sigmoid_accel to your input-processors chain.
  *
- * Example usage in your keymap/config:
+ * The `cpi` property MUST match your hardware sensor CPI. Override it in
+ * your overlay. Other properties can be left at defaults or tuned.
  *
+ * Example (in your overlay):
  *   #include <behaviors/input_processor_sigmoid_accel.dtsi>
  *
- *   &glidepoint_listener {
- *       input-processors = <&sigmoid_accel>, <&zip_xy_transform ...>, ...;
+ *   &trackball_listener {
+ *       input-processors = <&zip_zxy>, <&sigmoid_accel>;
  *   };
  *
- * To customize the acceleration curve, override the properties:
- *
  *   &sigmoid_accel {
- *       min-scale = <100>;   // 1.0x at slow speeds
- *       max-scale = <400>;   // 4.0x at fast speeds
- *       threshold = <30>;    // lower = acceleration kicks in earlier
- *       steepness = <15>;    // higher = sharper transition
+ *       cpi = <3200>;
  *   };
  */
 
@@ -29,18 +26,20 @@
         sigmoid_accel: sigmoid_accel {
             compatible = "zmk,input-processor-sigmoid-accel";
             #input-processor-cells = <0>;
-            track-remainders;     // processor handles its own remainder tracking
+            track-remainders;
 
             /*
-             * Default Steam Deck-like acceleration curve:
-             * - Slow movements: 1.0x (precise)
-             * - Fast movements: 3.0x (amplified)
-             * - Smooth transition around velocity 50
+             * CPI must be overridden to match your sensor. There is no
+             * universal default since it depends on hardware configuration.
              */
-            min-scale = <100>;    // 1.0x minimum scale
-            max-scale = <300>;    // 3.0x maximum scale
-            threshold = <50>;     // velocity threshold
-            steepness = <10>;     // gradual curve (0.1)
+            cpi = <800>;
+
+            /* Default curve parameters (matching zmk-pmw3610-driver maccel defaults) */
+            takeoff = <200>;      /* k = 2.0  — how sharply the curve takes off */
+            growth-rate = <25>;   /* g = 0.25 — how fast it reaches the upper limit */
+            offset = <220>;       /* s = 2.20 — velocity where acceleration kicks in */
+            limit = <20>;         /* m = 0.20 — minimum factor (slow speed) */
+            limit-upper = <100>;  /* upper = 1.00 — maximum factor (fast speed) */
         };
     };
 };

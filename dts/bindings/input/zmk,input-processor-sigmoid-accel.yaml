@@ -1,17 +1,22 @@
 description: |
-  Sigmoid acceleration input processor for Steam Deck-style trackpad feel.
-  Slow movements remain precise, fast movements are amplified.
+  maccel-style pointer acceleration input processor.
+  Applies the burkfers/Wimads acceleration curve:
+    f(v) = upper - (upper - limit) / (1 + exp(takeoff*(v-offset)))^(growth_rate/takeoff)
 
-  The acceleration curve follows: scale = min_scale + (max_scale - min_scale) * sigmoid((velocity - threshold) * steepness)
+  At slow speeds the factor approaches `limit` (< 1.0 = reduces reported CPI).
+  At fast speeds it approaches `limit-upper` (1.0 = full hardware CPI).
+
+  The `cpi` property must match the hardware sensor CPI so velocity is normalized
+  consistently across different CPI settings.
 
   Example:
     &sigmoid_accel {
-        compatible = "zmk,input-processor-sigmoid-accel";
-        #input-processor-cells = <0>;
-        min-scale = <100>;      // 1.0x at slow speeds (divided by 100)
-        max-scale = <300>;      // 3.0x at fast speeds (divided by 100)
-        threshold = <50>;       // velocity threshold for acceleration
-        steepness = <10>;       // how sharp the transition is (divided by 100)
+        cpi = <3200>;
+        takeoff = <200>;      // 2.0
+        growth-rate = <25>;   // 0.25
+        offset = <220>;       // 2.20
+        limit = <20>;         // 0.20 - slow movements at 20% speed
+        limit-upper = <100>;  // 1.00 - fast movements at full speed
     };
 
 compatible: "zmk,input-processor-sigmoid-accel"
@@ -23,39 +28,51 @@ properties:
     type: int
     required: true
     const: 0
-    description: Must be zero - no parameters at binding time
 
   track-remainders:
     type: boolean
-    description: |
-      Whether this processor tracks sub-pixel remainders internally.
-      Set to true since sigmoid_accel handles its own remainder tracking.
+    description: Processor handles sub-pixel carry internally.
 
-  min-scale:
+  cpi:
+    type: int
+    required: true
+    description: |
+      Hardware sensor CPI. Used to normalize velocity so the acceleration
+      parameters are independent of the sensor resolution.
+
+  takeoff:
+    type: int
+    default: 200
+    description: |
+      Controls how sharply the curve takes off (k), divided by 100.
+      Higher = more abrupt start. 200 = k of 2.0.
+
+  growth-rate:
+    type: int
+    default: 25
+    description: |
+      How quickly the curve reaches its upper limit (g), divided by 100.
+      Lower = flatter curve. 25 = g of 0.25.
+
+  offset:
+    type: int
+    default: 220
+    description: |
+      Velocity at which acceleration kicks in (s), divided by 100.
+      Higher = acceleration starts later (more low-speed precision).
+      220 = s of 2.20.
+
+  limit:
+    type: int
+    default: 20
+    description: |
+      Lower limit of the acceleration factor (m), divided by 100.
+      This is the factor applied to slow movements.
+      20 = 0.20x (slow movements at 20% of hardware CPI).
+
+  limit-upper:
     type: int
     default: 100
     description: |
-      Minimum scale factor (at slow speeds), divided by 100.
-      100 = 1.0x, 150 = 1.5x, etc.
-
-  max-scale:
-    type: int
-    default: 300
-    description: |
-      Maximum scale factor (at fast speeds), divided by 100.
-      200 = 2.0x, 300 = 3.0x, etc.
-
-  threshold:
-    type: int
-    default: 50
-    description: |
-      Velocity threshold where acceleration curve is centered.
-      Lower = acceleration kicks in earlier.
-
-  steepness:
-    type: int
-    default: 10
-    description: |
-      Steepness of the sigmoid curve, divided by 100.
-      Higher = sharper transition between slow/fast modes.
-      10 = 0.1 (gradual), 50 = 0.5 (moderate), 100 = 1.0 (sharp)
+      Upper limit of the acceleration factor, divided by 100.
+      100 = 1.00x (fast movements at full hardware CPI).
